@@ -1,0 +1,226 @@
+---
+title: "Demo"
+author: "Seraphina (Junming) Shi"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+Based on the *hal9001* R package by Rachael Phillips, Jeremy Coyle, and Nima Hejazi.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Objectives
+By the end of this demo, you will be able to:  
+
+* Fit HAL with CV-selected penalty or undermoothed HAL.  
+* Interpret the results from HAL-fit.   
+* Estimate the target parameter with HAL as a working model and obtain delta method based confidence intervals.  
+  + Average treatment effects.  
+  + Conditional average treatment effects.  
+  + Dose response curves.  
+
+# 1. Introduction 
+
+# 2. How to Fit HAL
+In this section, the functions of fitting HAL is demonstrated. 
+
+**Fitting any HAL consists of the following 2 steps**:  
+1. Define the outcome vector, Y, and the covariates matrix X.  
+2. Fit the HAL with selected smoothness order and other parameters.    
+
+**Running example with WASH Benefits dataset**:  
+We will use the WASH Benefits Bangladesh study as an example to guide this demo of HAL-based plug-in estimator. 
+
+#### Preliminaries
+First, we need to load the data, relevant functions, and relevant packages into the R session, and then make sure there is no missing values in the dataset. 
+
+
+**Load the data**
+```{r}
+library("data.table")
+
+washb_data <- fread(
+  paste0(
+    "https://raw.githubusercontent.com/tlverse/tlverse-data/master/",
+    "wash-benefits/washb_data.csv"
+  ),
+  stringsAsFactors = TRUE
+)
+```
+
+Take a peek at the first few rows of WASH dataset:
+```{r}
+head(washb_data)
+```
+
+**Remove missing values**
+Here we simply keep the complete cases by removing the rows with missing values. You can choose any other methods to deal with missing values.
+```{r}
+washb_data <- washb_data[complete.cases(washb_data), ]
+```
+
+#### Install hal9001 pacakge (as needed)
+To install any packge in R, we recommend clearing the R workspace and subsequently restarting the R session. In RStudio, you can accomplish this by navigating to the "Session" tab, selecting "Clear Workspace," and then proceeding to click on "Session" again and choosing "Restart R."
+
+```{r, eval = FALSE}
+install.packages("hal9001")
+```
+
+#### Load hal9001 package 
+Once the *hal9001* package is installed, we can load itas other other R package:
+```{r}
+library(hal9001)
+```
+
+load the *'dplyr'* package for easy and quick data manipulation.    
+load the *'glmnet'* package used in the undersmoothing HAL process. 
+```{r}
+library(dplyr)
+library(glmnet)
+```
+
+#### Source relevant functions
+You need to download the *'functions_UHAL_deltaCI.R'* for the github repo. Then source it to load relevant functions for fitting Undermoothed HAL and obtainning confidence intervals using the delta method.
+```{r}
+source('functions_UHAL_deltaCI.R')
+```
+
+## 2.1 Prepare data
+
+First, identify the outcome variable and save it as a numeric vector.  
+```{r}
+Y <- as.numeric(washb_data$whz)
+```
+
+Then, identify the treatment variable and other covariates, save them as a numeric matrix. If the treatment or other variables are categorical or ordinal, we need to convert them into numeric or dummy variables.   
+
+```{r}
+x_names = c("tr", 
+            "fracode", "month", "aged", "sex", "momage", "momedu", "momheight", 
+            "hfiacat", "Nlt18", "Ncomp", "watmin", "elec", "floor", "walls", 
+            "roof", "asset_table", "asset_chair", "asset_khat", 
+            "asset_chouki", "asset_tv", "asset_refrig")
+
+X <- washb_data %>% 
+    select(all_of(x_names)) %>% 
+    mutate_if(sapply(., is.factor), as.numeric)
+```
+
+We have categorical treatment variable initially. To be prepared to fit HAL, we transformed it into numeric values. Here is the transformation mapping: 
+```{r}
+table(X$tr, washb_data$tr)
+```
+
+## 2.2 Fit HAL
+### 2.2.1 CV-HAL
+
+To fit the CV-HAL using the prepared X and Y above, we call the '*fit_hal*' function from the *hal9001* package. The following code fits HAL with the default setting, where max_degree = 1, smoothness_orders = 1, and other arguements. You can look for '*fit_hal*' in the help pane in Rstudio or go to *https://rdrr.io/cran/hal9001/man/fit_hal.html* for more information. Before fitting, we will set a random number generator so the results are reproducible, and we will also time it. 
+```{r}
+start_time <- proc.time() # start time
+
+set.seed(123)
+# default setting 
+hal_CV <- fit_hal(X = X, Y = Y, 
+                  family = "gaussian")
+
+runtime_hal_fit <- proc.time() - start_time # end time - start time = run time
+runtime_hal_fit
+```
+
+Now we try to fit HAL with '*use_min = FALSE*' and zero smoothness order, where "lambda.1se" is used and the basis functions will all be indicators. To enable the downstream confidence interval calculation, we need to set the arguement '*return_x_basis = T*'. 
+```{r}
+start_time <- proc.time() # start time
+
+set.seed(123)
+hal_fit_zeroorder <- fit_hal(X = X, Y = Y, 
+                             family = "gaussian", 
+                             fit_control = list(use_min = FALSE),
+                             smoothness_orders = 0,
+                             return_x_basis = T)
+
+runtime_hal_fit <- proc.time() - start_time # end time - start time = run time
+runtime_hal_fit
+```
+
+### 2.2.2 Undersmoothed HAL
+First, we need to fit a cv-hal with the arguement '*return_x_basis = T*' by calling the '*fit_hal*' function. Then we pass in *'X'*, *'Y'*, *'hal_cv' fit object*, and *'family'* to the '*undersmooth_hal*' function (from the *'functions_UHAL_deltaCI.R'* file) to get the undersmoothed lambda. Then fit the undersmoothed HAL by calling *fit_hal*' function again with the undersmoothed lambda and other arguements same as initially fitting the cv-hal. 
+
+```{r}
+start_time <- proc.time() # start time
+
+set.seed(123)
+hal_cv <- fit_hal(X = X, Y = Y, 
+                  smoothness_orders = 1,
+                  family = "gaussian",
+                  return_x_basis = TRUE)
+
+undersmooth_hal_results <- undersmooth_hal(X, Y, 
+                                           fit_init = hal_cv,
+                                           family = "gaussian")
+
+hal_u <- fit_hal(X = X, Y = Y, 
+                smoothness_orders = 1,
+                family = "gaussian",
+                return_x_basis = TRUE,
+                fit_control = list(cv_select = FALSE),
+                lambda = undersmooth_hal_results$lambda_under)
+
+runtime_uhal_fit <- proc.time() - start_time # end time - start time = run time
+runtime_uhal_fit
+```
+
+There can be situations that there is no need for undersmoothing or we cannot undersmooth further. We can check this by whether '*lambda_init*' and '*lambda_under*' in the results of calling '*undersmooth_hal*' function are the same. If this is the case, we can just proceed with '*hal_cv*'. 
+
+```{r}
+set.seed(123)
+hal_cv_secondorder <- fit_hal(X = X, Y = Y, 
+                    smoothness_orders = 2,
+                    family = "gaussian",
+                    return_x_basis = TRUE)
+
+undersmooth_hal_results <- undersmooth_hal(X, Y, 
+                                           fit_init = hal_cv_secondorder,
+                                           family = "gaussian")
+
+print(undersmooth_hal_results$lambda_init == undersmooth_hal_results$lambda_under)
+```
+
+## 2.3 Sumarizing HAL fits
+
+The summary of a hal fit object will have the table of coefficients and the corresponding basis functions with non-zero coefficients. The lambda used will also be stored here.
+
+```{r}
+hal_fit_summary <- summary(hal_u)
+print(hal_fit_summary)
+
+print(hal_fit_summary$lambda)
+```
+
+
+
+# 3. Obtainning Estimates 
+## 3.1 Predictions
+### 3.1.1 Predicitons with new data
+### 3.1.2 Conterfactual predictions
+## 3.2 ATE
+## 3.3 CATE
+## 3.4 Dore response curve
+
+# 4. Confidence Intervals using Delta Method
+## 4.1 Predictions
+### 4.1.1 Binary outcome
+### 4.1.2 Continuous outcome
+## 4.2 ATE
+## 4.3 CATE
+## 4.4 Dore response curve
+
+# 5. Dore Response Curve Example with a Simulated Dataset
+## 5.1 Fit HAL
+## 5.2 Dose response curve estimatation
+## 5.3 Confidence intervals
+
