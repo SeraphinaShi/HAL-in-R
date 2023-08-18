@@ -6,6 +6,14 @@ output:
     toc: true
     toc_float: true
 ---
+<style>
+.grey-highlight {
+  background-color: #f0f0f0; /* Grey color */
+  padding: 2px 4px; /* Adjust padding as needed */
+  border-radius: 4px; /* Rounded corners */
+}
+</style>
+
 
 Based on the *hal9001* R package by Rachael Phillips, Jeremy Coyle, and Nima Hejazi.
 
@@ -17,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Objectives
 By the end of this demo, you will be able to:  
 
-* Fit HAL with CV-selected penalty or undermoothed HAL.  
+* Fit a HAL with CV-selected penalty and a undermoothed HAL.  
 * Interpret the results from HAL-fit.   
 * Estimate the target parameter with HAL as a working model and obtain delta method based confidence intervals.  
   + Average treatment effects.  
@@ -25,6 +33,9 @@ By the end of this demo, you will be able to:
   + Dose response curves.  
 
 # 1. Introduction 
+The Highly Adaptive Lasso (HAL) is a non-parametric machine learning algorithm that "creates efficient estimators of realistic statistical models of pathwise differential parameters. HAL creates efficient estimators of realistic statistical models of pathwise differential parameters. Furthermore, these models provide asymptotically normal estimators for non-pathwise-differential parameters, which can enable investigators to use HAL-based substitution estimators and the delta method rather than rely on parametric models." [**Highly Adaptive LASSO: Machine Learning That Provides Valid Nonparametric Inference in Realistic Models**] 
+
+This github page is to provide example code for straightforward uses of HAL. 
 
 # 2. How to Fit HAL
 In this section, the functions of fitting HAL is demonstrated. 
@@ -53,7 +64,7 @@ washb_data <- fread(
 )
 ```
 
-Take a peek at the first few rows of WASH dataset:
+Take a look at the first few rows of WASH dataset:
 ```{r}
 head(washb_data)
 ```
@@ -64,21 +75,30 @@ Here we simply keep the complete cases by removing the rows with missing values.
 washb_data <- washb_data[complete.cases(washb_data), ]
 ```
 
+
+With the goal of demonstrating how to use HAL, we will only use observations that had the 'Control' or 'Handwashing' treatments. Then we will set the treatment variable (<span class="grey-highlight">tr</span>) to be 1 if being treated by "Handwashing."
+```{r}
+washb_data_demo <- washb_data[washb_data$tr %in% c("Control", "Handwashing"), ]
+washb_data_demo$tr = as.numeric(washb_data_demo$tr == "Handwashing")
+```
+
 #### Install hal9001 pacakge (as needed)
 To install any packge in R, we recommend clearing the R workspace and subsequently restarting the R session. In RStudio, you can accomplish this by navigating to the "Session" tab, selecting "Clear Workspace," and then proceeding to click on "Session" again and choosing "Restart R."
+
+For standard use, we recommend installing the package from CRAN via:
 
 ```{r, eval = FALSE}
 install.packages("hal9001")
 ```
 
 #### Load hal9001 package 
-Once the *hal9001* package is installed, we can load itas other other R package:
+Once the <span class="grey-highlight">hal9001</span> package is installed, we can load it and other R packages:
 ```{r}
 library(hal9001)
 ```
 
-load the *'dplyr'* package for easy and quick data manipulation.    
-load the *'glmnet'* package used in the undersmoothing HAL process. 
+load the <span class="dplyr-highlight">dplyr</span> package for easy and quick data manipulation.    
+load the <span class="dplyr-highlight">glmnet</span> package used in the undersmoothing HAL process. 
 ```{r}
 library(dplyr)
 library(glmnet)
@@ -92,122 +112,117 @@ source('functions_UHAL_deltaCI.R')
 
 ## 2.1 Prepare data
 
-First, identify the outcome variable and save it as a numeric vector.  
+First, identify the outcome variable and save it as a numeric vector. In this example, we are interested in weight-for-height z-score (whz) as the outcome, which is continuouts. 
 ```{r}
-Y <- as.numeric(washb_data$whz)
+Y <- as.numeric(washb_data_demo$whz)
+head(Y)
 ```
 
 Then, identify the treatment variable and other covariates, save them as a numeric matrix. If the treatment or other variables are categorical or ordinal, we need to convert them into numeric or dummy variables.   
+For the WASH dataset, there are many choices of covariate combinations. Since the goal is to demonstrate the use of HAL, we will pick a smaller set of covariates with shorter run times. 
 
 ```{r}
-x_names = c("tr", 
-            "fracode", "month", "aged", "sex", "momage", "momedu", "momheight", 
-            "hfiacat", "Nlt18", "Ncomp", "watmin", "elec", "floor", "walls", 
-            "roof", "asset_table", "asset_chair", "asset_khat", 
-            "asset_chouki", "asset_tv", "asset_refrig")
-
-X <- washb_data %>% 
+# x_names = names(washb_data_demo)[names(washb_data_demo) != 'whz']
+x_names = c("tr", "month", "aged", "sex", "momage", "momheight", "hfiacat", "Nlt18", "Ncomp")
+X <- washb_data_demo %>% 
     select(all_of(x_names)) %>% 
     mutate_if(sapply(., is.factor), as.numeric)
+head(X)
 ```
 
-We have categorical treatment variable initially. To be prepared to fit HAL, we transformed it into numeric values. Here is the transformation mapping: 
-```{r}
-table(X$tr, washb_data$tr)
-```
 
 ## 2.2 Fit HAL
-### 2.2.1 CV-HAL
+### 2.2.1 HAL (CV-HAL) 
 
-To fit the CV-HAL using the prepared X and Y above, we call the '*fit_hal*' function from the *hal9001* package. The following code fits HAL with the default setting, where max_degree = 1, smoothness_orders = 1, and other arguements. You can look for '*fit_hal*' in the help pane in Rstudio or go to *https://rdrr.io/cran/hal9001/man/fit_hal.html* for more information. Before fitting, we will set a random number generator so the results are reproducible, and we will also time it. 
+To fit the CV-HAL using the prepared X and Y above, we call the <span class="dplyr-highlight">fit_hal</span>' function from the <span class="dplyr-highlight">fit_hal</span> package. The following provided  employs the default configuration to train HAL. This involves utilizing 10-fold cross-validation to select lambda, setting <span class="dplyr-highlight">max_degree</span> to 1, <span class="dplyr-highlight">smoothness_orders</span> to 1, <span class="dplyr-highlight">family</span> to "guassian", and incorporating additional arguments like <span class="dplyr-highlight">num_knots</span>. You can look for <span class="dplyr-highlight">fit_hal</span> in the help pane in Rstudio or go to *https://rdrr.io/cran/hal9001/man/fit_hal.html* for more information. To have reproducible results, we will set a random number generator.
 ```{r}
-start_time <- proc.time() # start time
-
 set.seed(123)
-# default setting 
-hal_CV <- fit_hal(X = X, Y = Y, 
-                  family = "gaussian")
 
-runtime_hal_fit <- proc.time() - start_time # end time - start time = run time
-runtime_hal_fit
+hal_fit <- fit_hal(X = X, Y = Y)
+
+hal_fit$times
 ```
 
-Now we try to fit HAL with '*use_min = FALSE*' and zero smoothness order, where "lambda.1se" is used and the basis functions will all be indicators. To enable the downstream confidence interval calculation, we need to set the arguement '*return_x_basis = T*'. 
-```{r}
-start_time <- proc.time() # start time
+**Specifying smoothness of the HAL model**
+We can use <span class="dplyr-highlight">smoothness_orders</span> arguement to enforce smoothness on the functional form of the HAL fit.   
+* <span class="dplyr-highlight">smoothness_orders = 0</span> provides a segmented constant approximation (via zero-order basis functions) that accommodates abrupt changes within the function. This is valuable when desiring to avoid assuming any level of smoothness or continuity in the underlying function.  
+* <span class="dplyr-highlight">smoothness_orders = 1</span> gives a piece-wise linear fit (via first-order basis functions), which is continuous and mostly differentiable.  
+* <span class="dplyr-highlight">smoothness_orders = k</span> gives a segmented polynomial fit (via k-order basis functions). 
 
-set.seed(123)
-hal_fit_zeroorder <- fit_hal(X = X, Y = Y, 
-                             family = "gaussian", 
-                             fit_control = list(use_min = FALSE),
-                             smoothness_orders = 0,
-                             return_x_basis = T)
+Mathematically, HAL fitting will find the optimal fit under the constraint that the total variation of the function’s k-th derivative is bounded by some constant, which is selected through cross-validation.
 
-runtime_hal_fit <- proc.time() - start_time # end time - start time = run time
-runtime_hal_fit
+When not sure about <span class="dplyr-highlight">smoothness_orders</span>, we suggest use the default value 1. 
+```{r, eval = FALSE}
+hal_fit_zeroorder <- fit_hal(X = X, Y = Y, smoothness_orders = 0)
+hal_fit_firstorder <- fit_hal(X = X, Y = Y) d
 ```
+
 
 ### 2.2.2 Undersmoothed HAL
-First, we need to fit a cv-hal with the arguement '*return_x_basis = T*' by calling the '*fit_hal*' function. Then we pass in *'X'*, *'Y'*, *'hal_cv' fit object*, and *'family'* to the '*undersmooth_hal*' function (from the *'functions_UHAL_deltaCI.R'* file) to get the undersmoothed lambda. Then fit the undersmoothed HAL by calling *fit_hal*' function again with the undersmoothed lambda and other arguements same as initially fitting the cv-hal. 
+Three steps to fit a undersmoothed HAL:  
+1. We need to fit a cv-hal with the arguement <span class="dplyr-highlight">return_x_basis = TRUE</span> by calling the <span class="dplyr-highlight">fit_hal</span> function.  
+2. We pass in <span class="dplyr-highlight">X</span>, <span class="dplyr-highlight">Y</span>, <span class="dplyr-highlight">hal_cv</span> fit object, and <span class="dplyr-highlight">family</span> to the <span class="dplyr-highlight">undersmooth_hal</span> function (from the *'functions_UHAL_deltaCI.R'* file) to get the undersmoothed lambda.   
+3. Then we fit the undersmoothed HAL by calling <span class="dplyr-highlight">fit_hal</span> function again with:  
+  + <span class="dplyr-highlight">lambda</span> to be the undersmoothed lambda,    
+  + <span class="dplyr-highlight">fit_control = list(cv_select = FALSE)</span> indicating no need to select a lambda through cross validation,   
+  + and other arguements the same as the initial fitting of cv-hal.   
 
 ```{r}
-start_time <- proc.time() # start time
-
-set.seed(123)
-hal_cv <- fit_hal(X = X, Y = Y, 
-                  smoothness_orders = 1,
-                  family = "gaussian",
-                  return_x_basis = TRUE)
+hal_cv_fit <- fit_hal(X = X, Y = Y, return_x_basis = TRUE)
 
 undersmooth_hal_results <- undersmooth_hal(X, Y, 
-                                           fit_init = hal_cv,
+                                           fit_init = hal_cv_fit,
                                            family = "gaussian")
 
-hal_u <- fit_hal(X = X, Y = Y, 
-                smoothness_orders = 1,
-                family = "gaussian",
+hal_u_fit <- fit_hal(X = X, Y = Y, 
                 return_x_basis = TRUE,
                 fit_control = list(cv_select = FALSE),
                 lambda = undersmooth_hal_results$lambda_under)
 
-runtime_uhal_fit <- proc.time() - start_time # end time - start time = run time
-runtime_uhal_fit
 ```
 
-There can be situations that there is no need for undersmoothing or we cannot undersmooth further. We can check this by whether '*lambda_init*' and '*lambda_under*' in the results of calling '*undersmooth_hal*' function are the same. If this is the case, we can just proceed with '*hal_cv*'. 
-
-```{r}
-set.seed(123)
-hal_cv_secondorder <- fit_hal(X = X, Y = Y, 
-                    smoothness_orders = 2,
-                    family = "gaussian",
-                    return_x_basis = TRUE)
-
-undersmooth_hal_results <- undersmooth_hal(X, Y, 
-                                           fit_init = hal_cv_secondorder,
-                                           family = "gaussian")
-
-print(undersmooth_hal_results$lambda_init == undersmooth_hal_results$lambda_under)
-```
+There can be situations that there is no need for undersmoothing or we cannot undersmooth further. We can check this by whether <span class="dplyr-highlight">lambda_init</span> and <span class="dplyr-highlight">lambda_under</span> in the results of calling <span class="dplyr-highlight">undersmooth_hal</span> function are the same. If this is the case, we can just proceed with <span class="dplyr-highlight">hal_cv</span>. 
 
 ## 2.3 Sumarizing HAL fits
 
-The summary of a hal fit object will have the table of coefficients and the corresponding basis functions with non-zero coefficients. The lambda used will also be stored here.
+The summary of a HAL fit object will have the table of non-zero coefficients and the corresponding basis functions. The lambda used will also be stored here.
 
 ```{r}
-hal_fit_summary <- summary(hal_u)
+hal_fit_summary <- summary(hal_u_fit)
 print(hal_fit_summary)
-
-print(hal_fit_summary$lambda)
 ```
 
 
 
 # 3. Obtainning Estimates 
 ## 3.1 Predictions
-### 3.1.1 Predicitons with new data
+
+We will use the previourly obtained fitted undersmoothed HAL object, <span class="dplyr-highlight">hal_u_fit</span>, to get the predicted whz value for each individual within the dataset.
+```{r}
+hal_u_preds <- predict(hal_u_fit, new_data = X)
+head(hal_u_preds)
+```
+
 ### 3.1.2 Conterfactual predictions
+Counterfactual predictions are predicted values under an intervention of interest. To continue the example on the WASH Benefits Bangladesh study and using the same subset of the data, suppose we would like to obtain predictions for every subject’s weight-for-height z-score (whz) outcome under an treatment (tr) intervention that sets it to the handwashing regime. To do so, we need to do two simple steps: 1) create a copy of the <span class="dplyr-highlight">X</span> matrix and intervene on <span class="dplyr-highlight">tr</span> in the copied matrix; 2) obtain prediction using the intervened matrix. 
+
+```{r}
+# 1. copy data & intervene
+X_intervene <- X
+X_intervene$tr = 1 
+head(X_intervene)
+``` 
+```{r}
+# 2. predictions
+counterfactual_pred <- predict(hal_u_fit, new_data = X_intervene)
+head(counterfactual_pred)
+``` 
+
 ## 3.2 ATE
+```{r}
+
+```
+
 ## 3.3 CATE
 ## 3.4 Dore response curve
 
