@@ -14,13 +14,16 @@ output:
 }
 </style>
 
+```{r setup, include = FALSE} 
+knitr::opts_chunk$set(
+  autodep=FALSE, warning=FALSE, message=FALSE, echo=TRUE
+)
+```
+
+
 
 Based on the *hal9001* R package by Rachael Phillips, Jeremy Coyle, and Nima Hejazi.
 
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 # Objectives
 By the end of this demo, you will be able to:  
@@ -93,7 +96,7 @@ install.packages("hal9001")
 
 #### Load hal9001 package 
 Once the <span class="grey-highlight">hal9001</span> package is installed, we can load it and other R packages:
-```{r}
+```{r, message=FALSE, warning=FALSE}
 library(hal9001)
 ```
 
@@ -143,7 +146,7 @@ hal_fit <- fit_hal(X = X, Y = Y)
 hal_fit$times
 ```
 
-**Specifying smoothness of the HAL model**
+**Specifying smoothness of the HAL model**    
 We can use <span class="dplyr-highlight">smoothness_orders</span> arguement to enforce smoothness on the functional form of the HAL fit.   
 * <span class="dplyr-highlight">smoothness_orders = 0</span> provides a segmented constant approximation (via zero-order basis functions) that accommodates abrupt changes within the function. This is valuable when desiring to avoid assuming any level of smoothness or continuity in the underlying function.  
 * <span class="dplyr-highlight">smoothness_orders = 1</span> gives a piece-wise linear fit (via first-order basis functions), which is continuous and mostly differentiable.  
@@ -163,9 +166,9 @@ Three steps to fit a undersmoothed HAL:
 1. We need to fit a cv-hal with the arguement <span class="dplyr-highlight">return_x_basis = TRUE</span> by calling the <span class="dplyr-highlight">fit_hal</span> function.  
 2. We pass in <span class="dplyr-highlight">X</span>, <span class="dplyr-highlight">Y</span>, <span class="dplyr-highlight">hal_cv</span> fit object, and <span class="dplyr-highlight">family</span> to the <span class="dplyr-highlight">undersmooth_hal</span> function (from the *'functions_UHAL_deltaCI.R'* file) to get the undersmoothed lambda.   
 3. Then we fit the undersmoothed HAL by calling <span class="dplyr-highlight">fit_hal</span> function again with:  
-  + <span class="dplyr-highlight">lambda</span> to be the undersmoothed lambda,    
-  + <span class="dplyr-highlight">fit_control = list(cv_select = FALSE)</span> indicating no need to select a lambda through cross validation,   
-  + and other arguements the same as the initial fitting of cv-hal.   
+  - <span class="dplyr-highlight">lambda</span> to be the undersmoothed lambda,    
+  - <span class="dplyr-highlight">fit_control = list(cv_select = FALSE)</span> indicating no need to select a lambda through cross validation,   
+  - and other arguements the same as the initial fitting of cv-hal.   
 
 ```{r}
 hal_cv_fit <- fit_hal(X = X, Y = Y, return_x_basis = TRUE)

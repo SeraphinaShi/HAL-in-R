@@ -1621,28 +1621,12 @@ via:</p>
 <p>Once the <span class="grey-highlight">hal9001</span> package is
 installed, we can load it and other R packages:</p>
 <pre class="r"><code>library(hal9001)</code></pre>
-<pre><code>## Loading required package: Rcpp</code></pre>
-<pre><code>## hal9001 v0.4.3: The Scalable Highly Adaptive Lasso
-## note: fit_hal defaults have changed. See ?fit_hal for details</code></pre>
 <p>load the <span class="dplyr-highlight">dplyr</span> package for easy
 and quick data manipulation.<br />
 load the <span class="dplyr-highlight">glmnet</span> package used in the
 undersmoothing HAL process.</p>
-<pre class="r"><code>library(dplyr)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;dplyr&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:data.table&#39;:
-## 
-##     between, first, last</code></pre>
-<pre><code>## The following objects are masked from &#39;package:stats&#39;:
-## 
-##     filter, lag</code></pre>
-<pre><code>## The following objects are masked from &#39;package:base&#39;:
-## 
-##     intersect, setdiff, setequal, union</code></pre>
-<pre class="r"><code>library(glmnet)</code></pre>
-<pre><code>## Loading required package: Matrix</code></pre>
-<pre><code>## Loaded glmnet 4.1-4</code></pre>
+<pre class="r"><code>library(dplyr)
+library(glmnet)</code></pre>
 </div>
 <div id="source-relevant-functions" class="section level4">
 <h4>Source relevant functions</h4>
@@ -1699,14 +1683,15 @@ hal_fit &lt;- fit_hal(X = X, Y = Y)
 hal_fit$times</code></pre>
 <pre><code>##                   user.self sys.self elapsed user.child sys.child
 ## enumerate_basis       0.080    0.005   0.086          0         0
-## design_matrix         0.875    0.031   0.918          0         0
+## design_matrix         0.867    0.023   0.889          0         0
 ## reduce_basis          0.000    0.000   0.000          0         0
 ## remove_duplicates     0.000    0.000   0.000          0         0
-## lasso                84.519    0.673  86.330          0         0
-## total                85.475    0.709  87.334          0         0</code></pre>
-<p><strong>Specifying smoothness of the HAL model</strong> We can use
-<span class="dplyr-highlight">smoothness_orders</span> arguement to
-enforce smoothness on the functional form of the HAL fit.<br />
+## lasso                87.641    1.151  91.805          0         0
+## total                88.588    1.179  92.781          0         0</code></pre>
+<p><strong>Specifying smoothness of the HAL model</strong><br />
+We can use <span class="dplyr-highlight">smoothness_orders</span>
+arguement to enforce smoothness on the functional form of the HAL
+fit.<br />
 * <span class="dplyr-highlight">smoothness_orders = 0</span> provides a
 segmented constant approximation (via zero-order basis functions) that
 accommodates abrupt changes within the function. This is valuable when
@@ -1734,12 +1719,13 @@ hal_fit_firstorder &lt;- fit_hal(X = X, Y = Y) d</code></pre>
 2. We pass in <span class="dplyr-highlight">X</span>, <span class="dplyr-highlight">Y</span>, <span class="dplyr-highlight">hal_cv</span> fit object, and <span class="dplyr-highlight">family</span> to the <span class="dplyr-highlight">undersmooth_hal</span> function (from the
 <em>‘functions_UHAL_deltaCI.R’</em> file) to get the undersmoothed
 lambda.<br />
-3. Then we fit the undersmoothed HAL by calling <span class="dplyr-highlight">fit_hal</span> function again with: + <span class="dplyr-highlight">lambda</span> to be the undersmoothed
+3. Then we fit the undersmoothed HAL by calling <span class="dplyr-highlight">fit_hal</span> function again with:<br />
+- <span class="dplyr-highlight">lambda</span> to be the undersmoothed
 lambda,<br />
-+ <span class="dplyr-highlight">fit_control = list(cv_select =
+- <span class="dplyr-highlight">fit_control = list(cv_select =
 FALSE)</span> indicating no need to select a lambda through cross
-validation, + and other arguements the same as the initial fitting of
-cv-hal.</p>
+validation,<br />
+- and other arguements the same as the initial fitting of cv-hal.</p>
 <pre class="r"><code>hal_cv_fit &lt;- fit_hal(X = X, Y = Y, return_x_basis = TRUE)
 
 undersmooth_hal_results &lt;- undersmooth_hal(X, Y, 
