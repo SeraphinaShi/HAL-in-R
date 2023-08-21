@@ -79,10 +79,11 @@ washb_data <- washb_data[complete.cases(washb_data), ]
 ```
 
 
-With the goal of demonstrating how to use HAL, we will only use observations that had the 'Control' or 'Handwashing' treatments. Then we will set the treatment variable (<span class="grey-highlight">tr</span>) to be 1 if being treated by "Handwashing."
+With the goal of demonstrating how to use HAL, we will only use observations that had the control or WSH interventions. Then we will set the treatment variable (<span class="grey-highlight">tr</span>) to be 1 if being treated by WSH interventions. 
 ```{r}
-washb_data_demo <- washb_data[washb_data$tr %in% c("Control", "Handwashing"), ]
-washb_data_demo$tr = as.numeric(washb_data_demo$tr == "Handwashing")
+washb_data_demo <- washb_data[washb_data$tr %in% c("Control", "WSH"), ]
+washb_data_demo$tr = as.numeric(washb_data_demo$tr == "WSH")
+table(washb_data_demo$tr)
 ```
 
 #### Install hal9001 pacakge (as needed)
@@ -115,18 +116,19 @@ source('functions_UHAL_deltaCI.R')
 
 ## 2.1 Prepare data
 
-First, identify the outcome variable and save it as a numeric vector. In this example, we are interested in weight-for-height z-score (whz) as the outcome, which is continuouts. 
+First, identify the outcome variable and save it as a numeric vector. In this example, we are interested in weight-for-height z-score (<span class="dplyr-highlight">whz</span>) as the outcome, which is continuouts. 
 ```{r}
 Y <- as.numeric(washb_data_demo$whz)
 head(Y)
 ```
 
-Then, identify the treatment variable and other covariates, save them as a numeric matrix. If the treatment or other variables are categorical or ordinal, we need to convert them into numeric or dummy variables.   
+Then, identify the treatment variable and other covariates, save them as a numeric data frame or a numeric matrix. If the treatment or other variables are categorical or ordinal, we need to convert them into numeric or dummy variables.   
 For the WASH dataset, there are many choices of covariate combinations. Since the goal is to demonstrate the use of HAL, we will pick a smaller set of covariates with shorter run times. 
 
 ```{r}
 # x_names = names(washb_data_demo)[names(washb_data_demo) != 'whz']
-x_names = c("tr", "month", "aged", "sex", "momage", "momheight", "hfiacat", "Nlt18", "Ncomp")
+washb_data_demo$sexF = as.numeric(washb_data_demo$sex == "female")
+x_names = c("tr", "month", "aged", "sexF", "momage", "momheight", "hfiacat", "Nlt18", "Ncomp")
 X <- washb_data_demo %>% 
     select(all_of(x_names)) %>% 
     mutate_if(sapply(., is.factor), as.numeric)
@@ -171,6 +173,7 @@ Three steps to fit a undersmoothed HAL:
   - and other arguements the same as the initial fitting of cv-hal.   
 
 ```{r}
+set.seed(123)
 hal_cv_fit <- fit_hal(X = X, Y = Y, return_x_basis = TRUE)
 
 undersmooth_hal_results <- undersmooth_hal(X, Y, 
@@ -197,7 +200,7 @@ print(hal_fit_summary)
 
 
 
-# 3. Obtainning Estimates 
+# 3. Obtainning Predictions 
 ## 3.1 Predictions
 
 We will use the previourly obtained fitted undersmoothed HAL object, <span class="dplyr-highlight">hal_u_fit</span>, to get the predicted whz value for each individual within the dataset.
@@ -206,8 +209,9 @@ hal_u_preds <- predict(hal_u_fit, new_data = X)
 head(hal_u_preds)
 ```
 
-### 3.1.2 Conterfactual predictions
-Counterfactual predictions are predicted values under an intervention of interest. To continue the example on the WASH Benefits Bangladesh study and using the same subset of the data, suppose we would like to obtain predictions for every subject’s weight-for-height z-score (whz) outcome under an treatment (tr) intervention that sets it to the handwashing regime. To do so, we need to do two simple steps: 1) create a copy of the <span class="dplyr-highlight">X</span> matrix and intervene on <span class="dplyr-highlight">tr</span> in the copied matrix; 2) obtain prediction using the intervened matrix. 
+### 3.2 Counterfactual predictions
+Counterfactual predictions are predicted values under an intervention of interest.   
+To continue the example on the WASH Benefits Bangladesh study and using the same subset of the data, suppose we would like to obtain predictions for every subject’s weight-for-height z-score (<span class="dplyr-highlight">whz</span>) outcome under an treatment (<span class="dplyr-highlight">tr</span>) intervention that sets it to the WSH interventions. To do so, we need to do two simple steps: 1) create a copy of the <span class="dplyr-highlight">X</span> matrix and intervene on <span class="dplyr-highlight">tr</span> in the copied matrix; 2) obtain prediction using the intervened matrix. 
 
 ```{r}
 # 1. copy data & intervene
@@ -221,21 +225,40 @@ counterfactual_pred <- predict(hal_u_fit, new_data = X_intervene)
 head(counterfactual_pred)
 ``` 
 
-## 3.2 ATE
-```{r}
+# 4. Obtainning Estimates and Inferences 
 
+## 4.1 Counterfactual Outcome Mean
+Counterfactual outcome mean is the average outcome that all individuals in the target population would have experienced if they had received a particular treatment or exposure value. 
+Suppose we are interested in the average weight-for-height z-score (<span class="dplyr-highlight">whz</span>) if all of the people in Bangladesh had the WSH interventions (i.e. the conterfactual outcome mean): $\mathbb{E}_P(Y_1)$.
+
+```{r}
+CMean_infr = CounterfactualMean_inferece(X, Y, treatment = "tr", treatment_level = 1, hal_fit = hal_u_fit, family = "gaussian")
+print(CMean_infr)
 ```
 
-## 3.3 CATE
-## 3.4 Dore response curve
-
-# 4. Confidence Intervals using Delta Method
-## 4.1 Predictions
-### 4.1.1 Binary outcome
-### 4.1.2 Continuous outcome
 ## 4.2 ATE
-## 4.3 CATE
-## 4.4 Dore response curve
+
+The average treatment effect (ATE) is a measure of difference in outcomes of interest between the treatment intervention to the control.   
+Now suppose we are interested in the causal effect of weight-for-height z-score (<span class="dplyr-highlight">whz</span>) due to WSH interventions, which is the difference between average counterfactual weight-for-height z-score if all of the people in Bangladesh got the WSH interventions versus all of the people in Bangladesh did not have WSH interventions (i.e. the average treatment effect): $$\Psi(P) = \mathbb{E}_P(Y_1) - \mathbb{E}_P(Y_0)$$  where $Y_a$ denotes the counterfactual outcome (weight-for-height z-score), if possibly contrary to fact, the person had interventions status A = a.
+
+```{r}
+# Using the provided function to obtain the ATE: 
+ATE_infr = ATE_inferece(X, Y, treatment = "tr", hal_fit = hal_u_fit, family = "gaussian")
+
+print(ATE_infr)
+```
+
+## 4.2 CATE
+The conditional average treatment effect (CATE) is the average treatment effect on an outcome variable for a specific subgroup or conditional population defined by a set of covariates or characteristics.
+
+Suppose we are interested in the causal effect of weight-for-height z-score (<span class="dplyr-highlight">whz</span>) due to WSH interventions among males (i.e. the conditional average treatment effect among males): $$\Psi(P_{male}) = \mathbb{E}_{P_{male}}(Y_1) - \mathbb{E}_{P_{male}}(Y_0)$$.
+
+```{r}
+CATE_infr = ATE_inferece(X, Y, treatment = "tr", condition = "sexF", condition_level = 1, hal_fit = hal_u_fit, family = "gaussian")
+
+print(CATE_infr)
+```
+
 
 # 5. Dore Response Curve Example with a Simulated Dataset
 ## 5.1 Fit HAL

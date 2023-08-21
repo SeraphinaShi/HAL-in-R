@@ -1599,11 +1599,15 @@ complete cases by removing the rows with missing values. You can choose
 any other methods to deal with missing values.</p>
 <pre class="r"><code>washb_data &lt;- washb_data[complete.cases(washb_data), ]</code></pre>
 <p>With the goal of demonstrating how to use HAL, we will only use
-observations that had the ‘Control’ or ‘Handwashing’ treatments. Then we
-will set the treatment variable (<span class="grey-highlight">tr</span>)
-to be 1 if being treated by “Handwashing.”</p>
-<pre class="r"><code>washb_data_demo &lt;- washb_data[washb_data$tr %in% c(&quot;Control&quot;, &quot;Handwashing&quot;), ]
-washb_data_demo$tr = as.numeric(washb_data_demo$tr == &quot;Handwashing&quot;)</code></pre>
+observations that had the control or WSH interventions. Then we will set
+the treatment variable (<span class="grey-highlight">tr</span>) to be 1
+if being treated by WSH interventions.</p>
+<pre class="r"><code>washb_data_demo &lt;- washb_data[washb_data$tr %in% c(&quot;Control&quot;, &quot;WSH&quot;), ]
+washb_data_demo$tr = as.numeric(washb_data_demo$tr == &quot;WSH&quot;)
+table(washb_data_demo$tr)</code></pre>
+<pre><code>## 
+##    0    1 
+## 1165  583</code></pre>
 </div>
 <div id="install-hal9001-pacakge-as-needed" class="section level4">
 <h4>Install hal9001 pacakge (as needed)</h4>
@@ -1639,31 +1643,32 @@ method.</p>
 <div id="prepare-data" class="section level2">
 <h2>2.1 Prepare data</h2>
 <p>First, identify the outcome variable and save it as a numeric vector.
-In this example, we are interested in weight-for-height z-score (whz) as
-the outcome, which is continuouts.</p>
+In this example, we are interested in weight-for-height z-score (<span class="dplyr-highlight">whz</span>) as the outcome, which is
+continuouts.</p>
 <pre class="r"><code>Y &lt;- as.numeric(washb_data_demo$whz)
 head(Y)</code></pre>
 <pre><code>## [1]  0.00 -1.16 -1.05 -1.26 -0.59 -0.51</code></pre>
 <p>Then, identify the treatment variable and other covariates, save them
-as a numeric matrix. If the treatment or other variables are categorical
-or ordinal, we need to convert them into numeric or dummy
-variables.<br />
+as a numeric data frame or a numeric matrix. If the treatment or other
+variables are categorical or ordinal, we need to convert them into
+numeric or dummy variables.<br />
 For the WASH dataset, there are many choices of covariate combinations.
 Since the goal is to demonstrate the use of HAL, we will pick a smaller
 set of covariates with shorter run times.</p>
 <pre class="r"><code># x_names = names(washb_data_demo)[names(washb_data_demo) != &#39;whz&#39;]
-x_names = c(&quot;tr&quot;, &quot;month&quot;, &quot;aged&quot;, &quot;sex&quot;, &quot;momage&quot;, &quot;momheight&quot;, &quot;hfiacat&quot;, &quot;Nlt18&quot;, &quot;Ncomp&quot;)
+washb_data_demo$sexF = as.numeric(washb_data_demo$sex == &quot;female&quot;)
+x_names = c(&quot;tr&quot;, &quot;month&quot;, &quot;aged&quot;, &quot;sexF&quot;, &quot;momage&quot;, &quot;momheight&quot;, &quot;hfiacat&quot;, &quot;Nlt18&quot;, &quot;Ncomp&quot;)
 X &lt;- washb_data_demo %&gt;% 
     select(all_of(x_names)) %&gt;% 
     mutate_if(sapply(., is.factor), as.numeric)
 head(X)</code></pre>
-<pre><code>##    tr month aged sex momage momheight hfiacat Nlt18 Ncomp
-## 1:  0     9  268   2     30    146.40       1     3    11
-## 2:  0     9  286   2     25    148.75       3     2     4
-## 3:  0     9  264   2     25    152.15       1     1    10
-## 4:  0     9  252   1     28    140.25       1     3     5
-## 5:  0     9  336   1     19    150.95       1     2     7
-## 6:  0     9  304   2     20    154.20       4     0     3</code></pre>
+<pre><code>##    tr month aged sexF momage momheight hfiacat Nlt18 Ncomp
+## 1:  0     9  268    0     30    146.40       1     3    11
+## 2:  0     9  286    0     25    148.75       3     2     4
+## 3:  0     9  264    0     25    152.15       1     1    10
+## 4:  0     9  252    1     28    140.25       1     3     5
+## 5:  0     9  336    1     19    150.95       1     2     7
+## 6:  0     9  304    0     20    154.20       4     0     3</code></pre>
 </div>
 <div id="fit-hal" class="section level2">
 <h2>2.2 Fit HAL</h2>
@@ -1682,12 +1687,12 @@ hal_fit &lt;- fit_hal(X = X, Y = Y)
 
 hal_fit$times</code></pre>
 <pre><code>##                   user.self sys.self elapsed user.child sys.child
-## enumerate_basis       0.080    0.005   0.086          0         0
-## design_matrix         0.867    0.023   0.889          0         0
+## enumerate_basis       0.093    0.011   0.114          0         0
+## design_matrix         0.999    0.100   1.279          0         0
 ## reduce_basis          0.000    0.000   0.000          0         0
 ## remove_duplicates     0.000    0.000   0.000          0         0
-## lasso                87.641    1.151  91.805          0         0
-## total                88.588    1.179  92.781          0         0</code></pre>
+## lasso               124.013    5.834 144.055          0         0
+## total               125.105    5.945 145.448          0         0</code></pre>
 <p><strong>Specifying smoothness of the HAL model</strong><br />
 We can use <span class="dplyr-highlight">smoothness_orders</span>
 arguement to enforce smoothness on the functional form of the HAL
@@ -1726,7 +1731,8 @@ lambda,<br />
 FALSE)</span> indicating no need to select a lambda through cross
 validation,<br />
 - and other arguements the same as the initial fitting of cv-hal.</p>
-<pre class="r"><code>hal_cv_fit &lt;- fit_hal(X = X, Y = Y, return_x_basis = TRUE)
+<pre class="r"><code>set.seed(123)
+hal_cv_fit &lt;- fit_hal(X = X, Y = Y, return_x_basis = TRUE)
 
 undersmooth_hal_results &lt;- undersmooth_hal(X, Y, 
                                            fit_init = hal_cv_fit,
@@ -1751,36 +1757,36 @@ also be stored here.</p>
 print(hal_fit_summary)</code></pre>
 <pre><code>## 
 ## 
-## Summary of non-zero coefficients is based on lambda of 12.94065 
+## Summary of non-zero coefficients is based on lambda of 10.99614 
 ## 
 ##              coef
-##     -5.654544e-01
-##      4.919363e-05
-##      3.812544e-05
-##     -3.695689e-05
-##      3.258231e-05
+##     -7.219003e-01
+##      9.692868e-05
+##      8.841356e-05
+##      6.517827e-05
+##     -6.044765e-05
 ## ---              
-##     -2.689172e-07
-##     -1.094612e-07
-##      1.021887e-07
-##     -7.210209e-08
-##      1.210258e-08
-##                                                                                                                          term
-##                                                                                                                   (Intercept)
-##         [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(momheight &gt;= 150.95)*(momheight - 150.95)^1 ] * [ I(Nlt18 &gt;= 1)*(Nlt18 - 1)^1 ]
-##     [ I(aged &gt;= 298)*(aged - 298)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ] * [ I(Ncomp &gt;= 16)*(Ncomp - 16)^1 ]
-##       [ I(aged &gt;= 195)*(aged - 195)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ] * [ I(Nlt18 &gt;= 2)*(Nlt18 - 2)^1 ]
-##                         [ I(month &gt;= 6)*(month - 6)^1 ] * [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(Ncomp &gt;= 12)*(Ncomp - 12)^1 ]
-## ---                                                                                                                          
-##       [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ] * [ I(Ncomp &gt;= 12)*(Ncomp - 12)^1 ]
-##                           [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(Nlt18 &gt;= 0)*(Nlt18 - 0)^1 ] * [ I(Ncomp &gt;= 5)*(Ncomp - 5)^1 ]
-##                     [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(momage &gt;= 31)*(momage - 31)^1 ] * [ I(Ncomp &gt;= 10)*(Ncomp - 10)^1 ]
-##       [ I(aged &gt;= 286)*(aged - 286)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ] * [ I(Ncomp &gt;= 5)*(Ncomp - 5)^1 ]
-##     [ I(aged &gt;= 195)*(aged - 195)^1 ] * [ I(momage &gt;= 14)*(momage - 14)^1 ] * [ I(momheight &gt;= 148.5)*(momheight - 148.5)^1 ]</code></pre>
+##      8.379390e-09
+##     -5.753798e-09
+##      3.231291e-10
+##      1.834215e-10
+##     -1.001140e-10
+##                                                                                                                            term
+##                                                                                                                     (Intercept)
+##             [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(momheight &gt;= 152.3)*(momheight - 152.3)^1 ] * [ I(Nlt18 &gt;= 1)*(Nlt18 - 1)^1 ]
+##                                   [ I(tr &gt;= 0)*(tr - 0)^1 ] * [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(Ncomp &gt;= 4)*(Ncomp - 4)^1 ]
+##         [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(momheight &gt;= 155.05)*(momheight - 155.05)^1 ] * [ I(Ncomp &gt;= 10)*(Ncomp - 10)^1 ]
+##       [ I(aged &gt;= 332)*(aged - 332)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ] * [ I(Ncomp &gt;= 12)*(Ncomp - 12)^1 ]
+## ---                                                                                                                            
+##         [ I(aged &gt;= 299)*(aged - 299)^1 ] * [ I(momheight &gt;= 143.65)*(momheight - 143.65)^1 ] * [ I(Ncomp &gt;= 8)*(Ncomp - 8)^1 ]
+##       [ I(aged &gt;= 42)*(aged - 42)^1 ] * [ I(momage &gt;= 18)*(momage - 18)^1 ] * [ I(momheight &gt;= 145.75)*(momheight - 145.75)^1 ]
+##     [ I(aged &gt;= 233)*(aged - 233)^1 ] * [ I(momage &gt;= 14)*(momage - 14)^1 ] * [ I(momheight &gt;= 148.75)*(momheight - 148.75)^1 ]
+##     [ I(aged &gt;= 196)*(aged - 196)^1 ] * [ I(momage &gt;= 14)*(momage - 14)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ]
+##     [ I(aged &gt;= 260)*(aged - 260)^1 ] * [ I(momage &gt;= 18)*(momage - 18)^1 ] * [ I(momheight &gt;= 120.65)*(momheight - 120.65)^1 ]</code></pre>
 </div>
 </div>
-<div id="obtainning-estimates" class="section level1">
-<h1>3. Obtainning Estimates</h1>
+<div id="obtainning-predictions" class="section level1">
+<h1>3. Obtainning Predictions</h1>
 <div id="predictions" class="section level2">
 <h2>3.1 Predictions</h2>
 <p>We will use the previourly obtained fitted undersmoothed HAL object,
@@ -1788,64 +1794,114 @@ print(hal_fit_summary)</code></pre>
 value for each individual within the dataset.</p>
 <pre class="r"><code>hal_u_preds &lt;- predict(hal_u_fit, new_data = X)
 head(hal_u_preds)</code></pre>
-<pre><code>## [1] -0.6953062 -0.6909382 -0.5184299 -0.7337897 -0.6115510 -0.6260420</code></pre>
-<div id="conterfactual-predictions" class="section level3">
-<h3>3.1.2 Conterfactual predictions</h3>
+<pre><code>## [1] -0.7095915 -0.5612373 -0.4113562 -0.6926089 -0.6274143 -0.4830798</code></pre>
+<div id="counterfactual-predictions" class="section level3">
+<h3>3.2 Counterfactual predictions</h3>
 <p>Counterfactual predictions are predicted values under an intervention
-of interest. To continue the example on the WASH Benefits Bangladesh
-study and using the same subset of the data, suppose we would like to
-obtain predictions for every subject’s weight-for-height z-score (whz)
-outcome under an treatment (tr) intervention that sets it to the
-handwashing regime. To do so, we need to do two simple steps: 1) create
-a copy of the <span class="dplyr-highlight">X</span> matrix and
-intervene on <span class="dplyr-highlight">tr</span> in the copied
-matrix; 2) obtain prediction using the intervened matrix.</p>
+of interest.<br />
+To continue the example on the WASH Benefits Bangladesh study and using
+the same subset of the data, suppose we would like to obtain predictions
+for every subject’s weight-for-height z-score (<span class="dplyr-highlight">whz</span>) outcome under an treatment (<span class="dplyr-highlight">tr</span>) intervention that sets it to the WSH
+interventions. To do so, we need to do two simple steps: 1) create a
+copy of the <span class="dplyr-highlight">X</span> matrix and intervene
+on <span class="dplyr-highlight">tr</span> in the copied matrix; 2)
+obtain prediction using the intervened matrix.</p>
 <pre class="r"><code># 1. copy data &amp; intervene
 X_intervene &lt;- X
 X_intervene$tr = 1 
 head(X_intervene)</code></pre>
-<pre><code>##    tr month aged sex momage momheight hfiacat Nlt18 Ncomp
-## 1:  1     9  268   2     30    146.40       1     3    11
-## 2:  1     9  286   2     25    148.75       3     2     4
-## 3:  1     9  264   2     25    152.15       1     1    10
-## 4:  1     9  252   1     28    140.25       1     3     5
-## 5:  1     9  336   1     19    150.95       1     2     7
-## 6:  1     9  304   2     20    154.20       4     0     3</code></pre>
+<pre><code>##    tr month aged sexF momage momheight hfiacat Nlt18 Ncomp
+## 1:  1     9  268    0     30    146.40       1     3    11
+## 2:  1     9  286    0     25    148.75       3     2     4
+## 3:  1     9  264    0     25    152.15       1     1    10
+## 4:  1     9  252    1     28    140.25       1     3     5
+## 5:  1     9  336    1     19    150.95       1     2     7
+## 6:  1     9  304    0     20    154.20       4     0     3</code></pre>
 <pre class="r"><code># 2. predictions
 counterfactual_pred &lt;- predict(hal_u_fit, new_data = X_intervene)
 head(counterfactual_pred)</code></pre>
-<pre><code>## [1] -0.7199836 -0.7206140 -0.5479337 -0.7508706 -0.6517760 -0.6647523</code></pre>
+<pre><code>## [1] -0.5561809 -0.5592996 -0.2424205 -0.6498592 -0.6191041 -0.4957763</code></pre>
 </div>
+</div>
+</div>
+<div id="obtainning-estimates-and-inferences" class="section level1">
+<h1>4. Obtainning Estimates and Inferences</h1>
+<div id="counterfactual-outcome-mean" class="section level2">
+<h2>4.1 Counterfactual Outcome Mean</h2>
+<p>Counterfactual outcome mean is the average outcome that all
+individuals in the target population would have experienced if they had
+received a particular treatment or exposure value. Suppose we are
+interested in the average weight-for-height z-score (<span class="dplyr-highlight">whz</span>) if all of the people in Bangladesh
+had the WSH interventions (i.e. the conterfactual outcome mean): <span class="math inline">\(\mathbb{E}_P(Y_1)\)</span>.</p>
+<pre class="r"><code>CMean_infr = CounterfactualMean_inferece(X, Y, treatment = &quot;tr&quot;, treatment_level = 1, hal_fit = hal_u_fit, family = &quot;gaussian&quot;)
+print(CMean_infr)</code></pre>
+<pre><code>## $Target_parameter
+## [1] &quot;EE[Y|A=1, W]&quot;
+## 
+## $Estimate
+## [1] -0.4579066
+## 
+## $SE
+## [1] 3.695635
+## 
+## $CI
+## [1] -7.701218  6.785405</code></pre>
 </div>
 <div id="ate" class="section level2">
-<h2>3.2 ATE</h2>
+<h2>4.2 ATE</h2>
+<p>The average treatment effect (ATE) is a measure of difference in
+outcomes of interest between the treatment intervention to the
+control.<br />
+Now suppose we are interested in the causal effect of weight-for-height
+z-score (<span class="dplyr-highlight">whz</span>) due to WSH
+interventions, which is the difference between average counterfactual
+weight-for-height z-score if all of the people in Bangladesh got the WSH
+interventions versus all of the people in Bangladesh did not have WSH
+interventions (i.e. the average treatment effect): <span class="math display">\[\Psi(P) = \mathbb{E}_P(Y_1) -
+\mathbb{E}_P(Y_0)\]</span> where <span class="math inline">\(Y_a\)</span> denotes the counterfactual outcome
+(weight-for-height z-score), if possibly contrary to fact, the person
+had interventions status A = a.</p>
+<pre class="r"><code># Using the provided function to obtain the ATE: 
+ATE_infr = ATE_inferece(X, Y, treatment = &quot;tr&quot;, hal_fit = hal_u_fit, family = &quot;gaussian&quot;)
+
+print(ATE_infr)</code></pre>
+<pre><code>## $Target_parameter
+## [1] &quot;E[Y_1] - E[Y_0]&quot;
+## 
+## $Estimate
+## [1] 0.1588137
+## 
+## $SE
+## [1] 0.342477
+## 
+## $CI
+## [1] -0.5124289  0.8300563</code></pre>
 </div>
 <div id="cate" class="section level2">
-<h2>3.3 CATE</h2>
-</div>
-<div id="dore-response-curve" class="section level2">
-<h2>3.4 Dore response curve</h2>
-</div>
-</div>
-<div id="confidence-intervals-using-delta-method" class="section level1">
-<h1>4. Confidence Intervals using Delta Method</h1>
-<div id="predictions-1" class="section level2">
-<h2>4.1 Predictions</h2>
-<div id="binary-outcome" class="section level3">
-<h3>4.1.1 Binary outcome</h3>
-</div>
-<div id="continuous-outcome" class="section level3">
-<h3>4.1.2 Continuous outcome</h3>
-</div>
-</div>
-<div id="ate-1" class="section level2">
-<h2>4.2 ATE</h2>
-</div>
-<div id="cate-1" class="section level2">
-<h2>4.3 CATE</h2>
-</div>
-<div id="dore-response-curve-1" class="section level2">
-<h2>4.4 Dore response curve</h2>
+<h2>4.2 CATE</h2>
+<p>The conditional average treatment effect (CATE) is the average
+treatment effect on an outcome variable for a specific subgroup or
+conditional population defined by a set of covariates or
+characteristics.</p>
+<p>Suppose we are interested in the causal effect of weight-for-height
+z-score (<span class="dplyr-highlight">whz</span>) due to WSH
+interventions among males (i.e. the conditional average treatment effect
+among males): <span class="math display">\[\Psi(P_{male}) =
+\mathbb{E}_{P_{male}}(Y_1) - \mathbb{E}_{P_{male}}(Y_0)\]</span>.</p>
+<pre class="r"><code>CATE_infr = ATE_inferece(X, Y, treatment = &quot;tr&quot;, condition = &quot;sexF&quot;, condition_level = 1, hal_fit = hal_u_fit, family = &quot;gaussian&quot;)
+
+print(CATE_infr)</code></pre>
+<pre><code>## $Target_parameter
+## [1] &quot;E[Y_1|sexF=1] - E[Y_0|sexF=1]&quot;
+## 
+## $Estimate
+## [1] 0.1604635
+## 
+## $SE
+## [1] 0.3391918
+## 
+## $CI
+## [1] -0.5043403  0.8252673</code></pre>
 </div>
 </div>
 <div id="dore-response-curve-example-with-a-simulated-dataset" class="section level1">
