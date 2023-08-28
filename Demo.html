@@ -1600,8 +1600,8 @@ any other methods to deal with missing values.</p>
 <pre class="r"><code>washb_data &lt;- washb_data[complete.cases(washb_data), ]</code></pre>
 <p>With the goal of demonstrating how to use HAL, we will only use
 observations that had the control or WSH interventions. Then we will set
-the treatment variable (<span class="grey-highlight">tr</span>) to be 1
-if being treated by WSH interventions.</p>
+the treatment variable (<code>tr</code>) to be 1 if being treated by WSH
+interventions.</p>
 <pre class="r"><code>washb_data_demo &lt;- washb_data[washb_data$tr %in% c(&quot;Control&quot;, &quot;WSH&quot;), ]
 washb_data_demo$tr = as.numeric(washb_data_demo$tr == &quot;WSH&quot;)
 table(washb_data_demo$tr)</code></pre>
@@ -1622,13 +1622,13 @@ via:</p>
 </div>
 <div id="load-hal9001-package" class="section level4">
 <h4>Load hal9001 package</h4>
-<p>Once the <span class="grey-highlight">hal9001</span> package is
-installed, we can load it and other R packages:</p>
+<p>Once the <code>hal9001</code> package is installed, we can load it
+and other R packages:</p>
 <pre class="r"><code>library(hal9001)</code></pre>
-<p>load the <span class="dplyr-highlight">dplyr</span> package for easy
-and quick data manipulation.<br />
-load the <span class="dplyr-highlight">glmnet</span> package used in the
-undersmoothing HAL process.</p>
+<p>load the <code>dplyr</code> package for easy and quick data
+manipulation.<br />
+load the <code>glmnet</code> package used in the undersmoothing HAL
+process.</p>
 <pre class="r"><code>library(dplyr)
 library(glmnet)</code></pre>
 </div>
@@ -1643,8 +1643,8 @@ method.</p>
 <div id="prepare-data" class="section level2">
 <h2>2.1 Prepare data</h2>
 <p>First, identify the outcome variable and save it as a numeric vector.
-In this example, we are interested in weight-for-height z-score (<span class="dplyr-highlight">whz</span>) as the outcome, which is
-continuouts.</p>
+In this example, we are interested in weight-for-height z-score
+(<code>whz</code>) as the outcome, which is continuouts.</p>
 <pre class="r"><code>Y &lt;- as.numeric(washb_data_demo$whz)
 head(Y)</code></pre>
 <pre><code>## [1]  0.00 -1.16 -1.05 -1.26 -0.59 -0.51</code></pre>
@@ -1674,11 +1674,14 @@ head(X)</code></pre>
 <h2>2.2 Fit HAL</h2>
 <div id="hal-cv-hal" class="section level3">
 <h3>2.2.1 HAL (CV-HAL)</h3>
-<p>To fit the CV-HAL using the prepared X and Y above, we call the <span class="dplyr-highlight">fit_hal</span>’ function from the <span class="dplyr-highlight">fit_hal</span> package. The following provided
-employs the default configuration to train HAL. This involves utilizing
-10-fold cross-validation to select lambda, setting <span class="dplyr-highlight">max_degree</span> to 1, <span class="dplyr-highlight">smoothness_orders</span> to 1, <span class="dplyr-highlight">family</span> to “guassian”, and incorporating
-additional arguments like <span class="dplyr-highlight">num_knots</span>. You can look for <span class="dplyr-highlight">fit_hal</span> in the help pane in Rstudio or go
-to <em><a href="https://rdrr.io/cran/hal9001/man/fit_hal.html" class="uri">https://rdrr.io/cran/hal9001/man/fit_hal.html</a></em> for
+<p>To fit the CV-HAL using the prepared X and Y above, we call the
+<code>fit_hal</code>’ function from the <code>fit_hal</code> package.
+The following provided employs the default configuration to train HAL.
+This involves utilizing 10-fold cross-validation to select lambda,
+setting <code>max_degree</code> to 1, <code>smoothness_orders</code> to
+1, <code>family</code> to “guassian”, and incorporating additional
+arguments like <code>num_knots</code>. You can look for
+<code>fit_hal</code> in the help pane in Rstudio or go to <em><a href="https://rdrr.io/cran/hal9001/man/fit_hal.html" class="uri">https://rdrr.io/cran/hal9001/man/fit_hal.html</a></em> for
 more information. To have reproducible results, we will set a random
 number generator.</p>
 <pre class="r"><code>set.seed(123)
@@ -1687,49 +1690,49 @@ hal_fit &lt;- fit_hal(X = X, Y = Y)
 
 hal_fit$times</code></pre>
 <pre><code>##                   user.self sys.self elapsed user.child sys.child
-## enumerate_basis       0.093    0.011   0.114          0         0
-## design_matrix         0.999    0.100   1.279          0         0
+## enumerate_basis       0.081    0.006   0.087          0         0
+## design_matrix         0.867    0.028   0.899          0         0
 ## reduce_basis          0.000    0.000   0.000          0         0
 ## remove_duplicates     0.000    0.000   0.000          0         0
-## lasso               124.013    5.834 144.055          0         0
-## total               125.105    5.945 145.448          0         0</code></pre>
+## lasso               108.873    0.392 109.328          0         0
+## total               109.821    0.426 110.315          0         0</code></pre>
 <p><strong>Specifying smoothness of the HAL model</strong><br />
-We can use <span class="dplyr-highlight">smoothness_orders</span>
-arguement to enforce smoothness on the functional form of the HAL
-fit.<br />
-* <span class="dplyr-highlight">smoothness_orders = 0</span> provides a
-segmented constant approximation (via zero-order basis functions) that
-accommodates abrupt changes within the function. This is valuable when
-desiring to avoid assuming any level of smoothness or continuity in the
-underlying function.<br />
-* <span class="dplyr-highlight">smoothness_orders = 1</span> gives a
-piece-wise linear fit (via first-order basis functions), which is
-continuous and mostly differentiable.<br />
-* <span class="dplyr-highlight">smoothness_orders = k</span> gives a
-segmented polynomial fit (via k-order basis functions).</p>
+We can use <code>smoothness_orders</code> arguement to enforce
+smoothness on the functional form of the HAL fit.<br />
+* <code>smoothness_orders = 0</code> provides a segmented constant
+approximation (via zero-order basis functions) that accommodates abrupt
+changes within the function. This is valuable when desiring to avoid
+assuming any level of smoothness or continuity in the underlying
+function.<br />
+* <code>smoothness_orders = 1</code> gives a piece-wise linear fit (via
+first-order basis functions), which is continuous and mostly
+differentiable.<br />
+* <code>smoothness_orders = k</code> gives a segmented polynomial fit
+(via k-order basis functions).</p>
 <p>Mathematically, HAL fitting will find the optimal fit under the
 constraint that the total variation of the function’s k-th derivative is
 bounded by some constant, which is selected through
 cross-validation.</p>
-<p>When not sure about <span class="dplyr-highlight">smoothness_orders</span>, we suggest use the
-default value 1.</p>
+<p>When not sure about <code>smoothness_orders</code>, we suggest use
+the default value 1.</p>
 <pre class="r"><code>hal_fit_zeroorder &lt;- fit_hal(X = X, Y = Y, smoothness_orders = 0)
 hal_fit_firstorder &lt;- fit_hal(X = X, Y = Y) d</code></pre>
 </div>
 <div id="undersmoothed-hal" class="section level3">
 <h3>2.2.2 Undersmoothed HAL</h3>
 <p>Three steps to fit a undersmoothed HAL:<br />
-1. We need to fit a cv-hal with the arguement <span class="dplyr-highlight">return_x_basis = TRUE</span> by calling the
-<span class="dplyr-highlight">fit_hal</span> function.<br />
-2. We pass in <span class="dplyr-highlight">X</span>, <span class="dplyr-highlight">Y</span>, <span class="dplyr-highlight">hal_cv</span> fit object, and <span class="dplyr-highlight">family</span> to the <span class="dplyr-highlight">undersmooth_hal</span> function (from the
-<em>‘functions_UHAL_deltaCI.R’</em> file) to get the undersmoothed
-lambda.<br />
-3. Then we fit the undersmoothed HAL by calling <span class="dplyr-highlight">fit_hal</span> function again with:<br />
-- <span class="dplyr-highlight">lambda</span> to be the undersmoothed
-lambda,<br />
-- <span class="dplyr-highlight">fit_control = list(cv_select =
-FALSE)</span> indicating no need to select a lambda through cross
-validation,<br />
+1. We need to fit a cv-hal with the arguement
+<code>return_x_basis = TRUE</code> by calling the <code>fit_hal</code>
+function.<br />
+2. We pass in <code>X</code>, <code>Y</code>, <code>hal_cv</code> fit
+object, and <code>family</code> to the <code>undersmooth_hal</code>
+function (from the <em>‘functions_UHAL_deltaCI.R’</em> file) to get the
+undersmoothed lambda.<br />
+3. Then we fit the undersmoothed HAL by calling <code>fit_hal</code>
+function again with:<br />
+- <code>lambda</code> to be the undersmoothed lambda,<br />
+- <code>fit_control = list(cv_select = FALSE)</code> indicating no need
+to select a lambda through cross validation,<br />
 - and other arguements the same as the initial fitting of cv-hal.</p>
 <pre class="r"><code>set.seed(123)
 hal_cv_fit &lt;- fit_hal(X = X, Y = Y, return_x_basis = TRUE)
@@ -1743,9 +1746,10 @@ hal_u_fit &lt;- fit_hal(X = X, Y = Y,
                 fit_control = list(cv_select = FALSE),
                 lambda = undersmooth_hal_results$lambda_under)</code></pre>
 <p>There can be situations that there is no need for undersmoothing or
-we cannot undersmooth further. We can check this by whether <span class="dplyr-highlight">lambda_init</span> and <span class="dplyr-highlight">lambda_under</span> in the results of calling
-<span class="dplyr-highlight">undersmooth_hal</span> function are the
-same. If this is the case, we can just proceed with <span class="dplyr-highlight">hal_cv</span>.</p>
+we cannot undersmooth further. We can check this by whether
+<code>lambda_init</code> and <code>lambda_under</code> in the results of
+calling <code>undersmooth_hal</code> function are the same. If this is
+the case, we can just proceed with <code>hal_cv</code>.</p>
 </div>
 </div>
 <div id="sumarizing-hal-fits" class="section level2">
@@ -1790,8 +1794,8 @@ print(hal_fit_summary)</code></pre>
 <div id="predictions" class="section level2">
 <h2>3.1 Predictions</h2>
 <p>We will use the previourly obtained fitted undersmoothed HAL object,
-<span class="dplyr-highlight">hal_u_fit</span>, to get the predicted whz
-value for each individual within the dataset.</p>
+<code>hal_u_fit</code>, to get the predicted whz value for each
+individual within the dataset.</p>
 <pre class="r"><code>hal_u_preds &lt;- predict(hal_u_fit, new_data = X)
 head(hal_u_preds)</code></pre>
 <pre><code>## [1] -0.7095915 -0.5612373 -0.4113562 -0.6926089 -0.6274143 -0.4830798</code></pre>
@@ -1801,11 +1805,11 @@ head(hal_u_preds)</code></pre>
 of interest.<br />
 To continue the example on the WASH Benefits Bangladesh study and using
 the same subset of the data, suppose we would like to obtain predictions
-for every subject’s weight-for-height z-score (<span class="dplyr-highlight">whz</span>) outcome under an treatment (<span class="dplyr-highlight">tr</span>) intervention that sets it to the WSH
-interventions. To do so, we need to do two simple steps: 1) create a
-copy of the <span class="dplyr-highlight">X</span> matrix and intervene
-on <span class="dplyr-highlight">tr</span> in the copied matrix; 2)
-obtain prediction using the intervened matrix.</p>
+for every subject’s weight-for-height z-score (<code>whz</code>) outcome
+under an treatment (<code>tr</code>) intervention that sets it to the
+WSH interventions. To do so, we need to do two simple steps: 1) create a
+copy of the <code>X</code> matrix and intervene on <code>tr</code> in
+the copied matrix; 2) obtain prediction using the intervened matrix.</p>
 <pre class="r"><code># 1. copy data &amp; intervene
 X_intervene &lt;- X
 X_intervene$tr = 1 
@@ -1831,8 +1835,9 @@ head(counterfactual_pred)</code></pre>
 <p>Counterfactual outcome mean is the average outcome that all
 individuals in the target population would have experienced if they had
 received a particular treatment or exposure value. Suppose we are
-interested in the average weight-for-height z-score (<span class="dplyr-highlight">whz</span>) if all of the people in Bangladesh
-had the WSH interventions (i.e. the conterfactual outcome mean): <span class="math inline">\(\mathbb{E}_P(Y_1)\)</span>.</p>
+interested in the average weight-for-height z-score (<code>whz</code>)
+if all of the people in Bangladesh had the WSH interventions (i.e. the
+conterfactual outcome mean): <span class="math inline">\(\mathbb{E}_P(Y_1)\)</span>.</p>
 <pre class="r"><code>CMean_infr = CounterfactualMean_inferece(X, Y, treatment = &quot;tr&quot;, treatment_level = 1, hal_fit = hal_u_fit, family = &quot;gaussian&quot;)
 print(CMean_infr)</code></pre>
 <pre><code>## $Target_parameter
@@ -1853,12 +1858,12 @@ print(CMean_infr)</code></pre>
 outcomes of interest between the treatment intervention to the
 control.<br />
 Now suppose we are interested in the causal effect of weight-for-height
-z-score (<span class="dplyr-highlight">whz</span>) due to WSH
-interventions, which is the difference between average counterfactual
-weight-for-height z-score if all of the people in Bangladesh got the WSH
-interventions versus all of the people in Bangladesh did not have WSH
-interventions (i.e. the average treatment effect): <span class="math display">\[\Psi(P) = \mathbb{E}_P(Y_1) -
-\mathbb{E}_P(Y_0)\]</span> where <span class="math inline">\(Y_a\)</span> denotes the counterfactual outcome
+z-score (<code>whz</code>) due to WSH interventions, which is the
+difference between average counterfactual weight-for-height z-score if
+all of the people in Bangladesh got the WSH interventions versus all of
+the people in Bangladesh did not have WSH interventions (i.e. the
+average treatment effect): <span class="math display">\[\Psi(P) =
+\mathbb{E}_P(Y_1) - \mathbb{E}_P(Y_0)\]</span> where <span class="math inline">\(Y_a\)</span> denotes the counterfactual outcome
 (weight-for-height z-score), if possibly contrary to fact, the person
 had interventions status A = a.</p>
 <pre class="r"><code># Using the provided function to obtain the ATE: 
@@ -1884,10 +1889,9 @@ treatment effect on an outcome variable for a specific subgroup or
 conditional population defined by a set of covariates or
 characteristics.</p>
 <p>Suppose we are interested in the causal effect of weight-for-height
-z-score (<span class="dplyr-highlight">whz</span>) due to WSH
-interventions among males (i.e. the conditional average treatment effect
-among males): <span class="math display">\[\Psi(P_{male}) =
-\mathbb{E}_{P_{male}}(Y_1) - \mathbb{E}_{P_{male}}(Y_0)\]</span>.</p>
+z-score (<code>whz</code>) due to WSH interventions among males
+(i.e. the conditional average treatment effect among males): <span class="math display">\[\Psi(P_{male}) = \mathbb{E}_{P_{male}}(Y_1) -
+\mathbb{E}_{P_{male}}(Y_0)\]</span>.</p>
 <pre class="r"><code>CATE_infr = ATE_inferece(X, Y, treatment = &quot;tr&quot;, condition = &quot;sexF&quot;, condition_level = 1, hal_fit = hal_u_fit, family = &quot;gaussian&quot;)
 
 print(CATE_infr)</code></pre>
